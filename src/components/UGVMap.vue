@@ -7,7 +7,7 @@
   import L from 'leaflet';
   
   const mapContainer = ref<HTMLDivElement | null>(null);
-  const initialPosition = { lat: 59.437, lng: 24.7536 }; // Tallinn example
+  const initialPosition = { lat: 59.437, lng: 24.7536 };
   
   onMounted(() => {  
     if (!mapContainer.value) return;
