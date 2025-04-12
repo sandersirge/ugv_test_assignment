@@ -1,7 +1,39 @@
 # ugv_test_assignment
 
-## Vue 3 + TypeScript + Vite
+This is a Vue 3 + TypeScript interface prototype for an Unmanned Ground Vehicle (UGV). It features map integration, engine control, directional movement via keyboard, and waypoint handling.
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## Project Setup
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v14.18+ recommended)
+- npm (comes with Node.js)
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/sandersirge/ugv_test_assignment.git
+cd ugv_test_assignment
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Compile and Hot-Reload for Development:
+
+```bash
+npm run dev
+```
+
+Or compile for Production:
+
+```bash
+npm run build
+```
+
+Visit the given URL in your browser to see the project.
