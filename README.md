@@ -1,6 +1,6 @@
 # ugv_test_assignment
 
-This is a Vue 3 + TypeScript interface prototype for an Unmanned Ground Vehicle (UGV). It features map integration, engine control, directional movement via keyboard, and waypoint handling.
+This is a Vue 3 + TypeScript interface prototype for controlling an Unmanned Ground Vehicle (UGV). It features map integration, engine control, directional movement via keyboard, and waypoint handling.
 
 ## Project Setup
 
