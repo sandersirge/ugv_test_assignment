@@ -1,13 +1,24 @@
 <template>
     <div class="map-wrapper">
         <div id="map" ref="mapContainer" class="map-container"></div>
-            <button class="engine-btn" @click="toggleEngine">
-                <span class="icon">{{ engineStarted ? '🛑' : '✅' }}</span>
-                {{ engineStarted ? 'Turn Off Engine' : 'Start Engine' }}
-            </button>
-            <div v-if="showPopup" class="popup-overlay">
+        
+        <button class="engine-btn" @click="toggleEngine">
+            <span class="icon">{{ engineStarted ? '🛑' : '✅' }}</span>
+            {{ engineStarted ? 'Turn Off Engine' : 'Start Engine' }}
+        </button>
+        
+        <div v-if="showPopup" class="popup-overlay">
             <div class="popup-content">
                 <p>Please start the engine!</p>
+            </div>
+        </div>
+
+        <div v-if="waypointManager.currentWaypoint.value" class="popup-overlay waypoint-popup">
+            <div class="popup-content">
+                <p v-if="formattedWaypoint">{{ formattedWaypoint }}</p>
+                <button @click="onDrive">Drive</button>
+                <button @click="onSave">Save</button>
+                <button @click="onDiscard">Discard</button>
             </div>
         </div>
     </div>
@@ -15,14 +26,29 @@
   
 <script lang="ts" setup>
     import { onMounted, ref, onBeforeUnmount } from 'vue';
+    import { computed } from 'vue';
     import { useEngineControl } from '../ts/useEngineControl.ts';
-    import { useUGVMap } from '../ts/useUGVMap.ts'
+    import { useUGVMap } from '../ts/useUGVMap.ts';
+    import { useWaypointManager } from '../ts/useWPManager.ts';
 
     const mapContainer = ref<HTMLDivElement | null>(null);
+    const currentPosition = ref<{ lat: number; lng: number } | null>(null);
     const { engineStarted, showPopup, toggleEngine, displayPopup } = useEngineControl();
     const initialPosition = { lat: 59.437, lng: 24.7536 };
     
     const ugvMap = useUGVMap();
+    const waypointManager = useWaypointManager();
+
+    const formattedWaypoint = computed(() => {
+        const wp = waypointManager.currentWaypoint.value;
+        if (!wp) return null;
+        return `Waypoint at (${wp.lat.toFixed(5)}, ${wp.lng.toFixed(5)})`;
+    });
+
+    const onMapLongPress = (e: L.LeafletMouseEvent) => {
+        waypointManager.addWaypoint(e.latlng.lat, e.latlng.lng);
+        ugvMap.setWaypointMarker(e.latlng.lat, e.latlng.lng);
+    };
 
     const handleKeydown = (event: KeyboardEvent) => {
         if (!engineStarted.value) {
@@ -31,14 +57,37 @@
         }
         ugvMap.handleKeydown(event);
     };
+
+    const onDrive = () => {
+        const destination = waypointManager.driveToWaypoint();
+        if (destination) {
+            ugvMap.driveTo(destination);
+            ugvMap.clearWaypointMarker();
+            waypointManager.discardWaypoint();
+        }
+    };
+
+    const onSave = () => {
+        ugvMap.clearWaypointMarker();
+        waypointManager.saveWaypoint();
+    };
+
+    const onDiscard = () => {
+        ugvMap.clearWaypointMarker();
+        waypointManager.discardWaypoint();
+    };
+
     onMounted(() => {  
         if (mapContainer.value) {
             ugvMap.initialize(mapContainer.value, initialPosition);
+            ugvMap.addLongPressListener(onMapLongPress);
             window.addEventListener('keydown', handleKeydown);
         }
     });
+
     onBeforeUnmount(() => {
         window.removeEventListener('keydown', handleKeydown);
+        ugvMap.removeLongPressListener();
         ugvMap.destroy();
     });
 </script>
@@ -46,8 +95,8 @@
 <style scoped>
     .map-wrapper {
         position: relative;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
     }
 
     .map-container {

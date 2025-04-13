@@ -11,12 +11,22 @@ export interface UGVMap {
     destroy: () => void;
     moveUGV: (forward?: boolean) => void;
     handleKeydown: (event: KeyboardEvent) => void;
+    driveTo: (destination: { lat: number; lng: number }) => void;
+    addLongPressListener: (callback: (e: L.LeafletMouseEvent) => void) => void;
+    removeLongPressListener: () => void;
+    setWaypointMarker: (lat: number, lng: number) => void;
+    clearWaypointMarker: () => void;
 }
 
 export function useUGVMap(): UGVMap {
     let map: L.Map | null = null;
     let marker: (L.Marker & { setRotationAngle: (angle: number) => void }) | null = null;
+    let waypointMarker: L.Marker | null = null;
+
     const heading = ref(0);
+
+    let mapElement: HTMLElement | null = null;
+    let longPressTimeout: number | null = null;
 
     function calculateOffsets(lat: number, meters: number, angleRad: number) {
         const latOffset = (meters / 111320) * Math.cos(angleRad);
@@ -43,12 +53,10 @@ export function useUGVMap(): UGVMap {
         icon: arrowIcon
         }) as L.Marker & { setRotationAngle: (angle: number) => void };
         marker.addTo(map).bindPopup('UGV Starting Point').openPopup();
-
-        window.addEventListener('keydown', handleKeydown);
+        waypointMarker = null;
     };
 
     const destroy = () => {
-        window.removeEventListener('keydown', handleKeydown);
         map?.remove();
     };
 
@@ -87,6 +95,74 @@ export function useUGVMap(): UGVMap {
         }
     };
 
+    const driveTo = (destination: { lat: number; lng: number }) => {
+        if (marker && map) {
+          marker.setLatLng([destination.lat, destination.lng]);
+          map.setView([destination.lat, destination.lng], map.getZoom(), { animate: true });
+        }
+    };
+
+    let onMouseDown: (e: MouseEvent) => void;
+    let onMouseUp: () => void;
+    let onTouchStart: (e: TouchEvent) => void;
+    let onTouchEnd: () => void;
+
+    const addLongPressListener = (callback: (e: L.LeafletMouseEvent) => void) => {
+        if (!map) return;
+        mapElement = map.getContainer();
+
+        const triggerLongPress = (clientX: number, clientY: number) => {
+            const point = L.point(clientX, clientY);
+            const simulatedLatLng = map!.containerPointToLatLng(point);
+            const leafletEvent = {
+                latlng: simulatedLatLng,
+                originalEvent: {} as MouseEvent
+            } as L.LeafletMouseEvent;
+            callback(leafletEvent);
+        };
+
+        onMouseDown = (e: MouseEvent) => {
+            longPressTimeout = window.setTimeout(() => {
+                triggerLongPress(e.clientX, e.clientY);
+            }, 1500);
+        };
+
+        onMouseUp = () => {
+            if (longPressTimeout) {
+                clearTimeout(longPressTimeout);
+                longPressTimeout = null;
+            }
+        };
+
+        onTouchStart = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            longPressTimeout = window.setTimeout(() => {
+                triggerLongPress(touch.clientX, touch.clientY);
+            }, 1500);
+        };
+
+        onTouchEnd = () => {
+            if (longPressTimeout) {
+                clearTimeout(longPressTimeout);
+                longPressTimeout = null;
+            }
+        };
+
+        mapElement.addEventListener("mousedown", onMouseDown);
+        mapElement.addEventListener("mouseup", onMouseUp);
+        mapElement.addEventListener("touchstart", onTouchStart);
+        mapElement.addEventListener("touchend", onTouchEnd);
+    };
+
+    const removeLongPressListener = () => {
+        if (!mapElement) return;
+        mapElement.removeEventListener("mousedown", onMouseDown);
+        mapElement.removeEventListener("mouseup", onMouseUp);
+        mapElement.removeEventListener("touchstart", onTouchStart);
+        mapElement.removeEventListener("touchend", onTouchEnd);
+        mapElement = null;
+    };
+
     return {
         map: map,
         marker: marker,
@@ -94,6 +170,31 @@ export function useUGVMap(): UGVMap {
         initialize,
         destroy,
         moveUGV,
-        handleKeydown
+        handleKeydown,
+        driveTo,
+        addLongPressListener,
+        removeLongPressListener,
+        setWaypointMarker: (lat: number, lng: number) => {
+            if (!map) return;
+        
+            if (!waypointMarker) {
+                waypointMarker = L.marker([lat, lng], {
+                    icon: L.icon({
+                        iconUrl: new URL('../assets/waypoint.svg', import.meta.url).href,
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                    }),
+                }).addTo(map);
+            } else {
+                waypointMarker.setLatLng([lat, lng]);
+            }
+        },
+        clearWaypointMarker: () => {
+            if (waypointMarker) {
+                map?.removeLayer(waypointMarker);
+                waypointMarker = null;
+            }
+        },
+        
     };
 }
