@@ -1,3 +1,8 @@
+/*
+For this file I used AI mainly for dealing with the usage of leaflet library
+and implementing the longpress and other keyboard events that manipulates with the UGV's location on the map.
+*/
+
 import type { Ref } from 'vue';
 import { ref } from 'vue';
 import L from 'leaflet';
@@ -12,7 +17,10 @@ export interface UGVMap {
     moveUGV: (forward?: boolean) => void;
     handleKeydown: (event: KeyboardEvent) => void;
     driveTo: (destination: { lat: number; lng: number }) => void;
-    addLongPressListener: (callback: (e: L.LeafletMouseEvent) => void) => void;
+    addLongPressListener: (
+        callback: (e: L.LeafletMouseEvent) => void,
+        shouldHandle?: () => boolean
+    ) => void;
     removeLongPressListener: () => void;
     setWaypointMarker: (lat: number, lng: number) => void;
     clearWaypointMarker: () => void;
@@ -42,9 +50,9 @@ export function useUGVMap(): UGVMap {
         }).addTo(map);
 
         const arrowIcon = L.icon({
-        iconUrl: new URL('../assets/arrow.svg', import.meta.url).href,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+            iconUrl: new URL('../assets/arrow.svg', import.meta.url).href,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
         });
 
         marker = L.marker([initialPosition.lat, initialPosition.lng], {
@@ -52,7 +60,7 @@ export function useUGVMap(): UGVMap {
         rotationOrigin: 'center center',
         icon: arrowIcon
         }) as L.Marker & { setRotationAngle: (angle: number) => void };
-        marker.addTo(map).bindPopup('UGV Starting Point').openPopup();
+        marker.addTo(map).bindPopup('UGV Marker').openPopup();
         waypointMarker = null;
     };
 
@@ -78,20 +86,20 @@ export function useUGVMap(): UGVMap {
     const handleKeydown = (event: KeyboardEvent) => {
         if (!map || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
         switch (event.key) {
-        case "ArrowUp":
-            moveUGV(true);
-            break;
-        case "ArrowDown":
-            moveUGV(false);
-            break;
-        case "ArrowLeft":
-            heading.value = (heading.value - 3 + 360) % 360;
-            marker?.setRotationAngle(heading.value);
-            break;
-        case "ArrowRight":
-            heading.value = (heading.value + 3) % 360;
-            marker?.setRotationAngle(heading.value);
-            break;
+            case "ArrowUp":
+                moveUGV(true);
+                break;
+            case "ArrowDown":
+                moveUGV(false);
+                break;
+            case "ArrowLeft":
+                heading.value = (heading.value - 3 + 360) % 360;
+                marker?.setRotationAngle(heading.value);
+                break;
+            case "ArrowRight":
+                heading.value = (heading.value + 3) % 360;
+                marker?.setRotationAngle(heading.value);
+                break;
         }
     };
 
@@ -107,11 +115,12 @@ export function useUGVMap(): UGVMap {
     let onTouchStart: (e: TouchEvent) => void;
     let onTouchEnd: () => void;
 
-    const addLongPressListener = (callback: (e: L.LeafletMouseEvent) => void) => {
+    const addLongPressListener = (callback: (e: L.LeafletMouseEvent) => void, shouldHandle: () => boolean = () => true) => {
         if (!map) return;
         mapElement = map.getContainer();
 
         const triggerLongPress = (clientX: number, clientY: number) => {
+            if (!shouldHandle()) return;
             const point = L.point(clientX, clientY);
             const simulatedLatLng = map!.containerPointToLatLng(point);
             const leafletEvent = {
@@ -122,6 +131,8 @@ export function useUGVMap(): UGVMap {
         };
 
         onMouseDown = (e: MouseEvent) => {
+            if (!shouldHandle() || (e.target as HTMLElement).closest('button, .ui, [data-ignore-longpress]')) return;
+
             longPressTimeout = window.setTimeout(() => {
                 triggerLongPress(e.clientX, e.clientY);
             }, 1500);
@@ -135,6 +146,8 @@ export function useUGVMap(): UGVMap {
         };
 
         onTouchStart = (e: TouchEvent) => {
+            if (!shouldHandle() || (e.target as HTMLElement).closest('button, .ui, [data-ignore-longpress]')) return;
+
             const touch = e.touches[0];
             longPressTimeout = window.setTimeout(() => {
                 triggerLongPress(touch.clientX, touch.clientY);
